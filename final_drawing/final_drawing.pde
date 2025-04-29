@@ -1,171 +1,130 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brush Interaction</title>
-    <!-- Include p5.js library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-        }
-        canvas {
-            display: block;
-        }
-    </style>
-</head>
-<body>
+// Converted from Processing (Java) to p5.js
+let brushLayer;
+let cursorLayer;
 
-<!-- Your p5.js sketch will be attached to the body -->
+let brushX, brushY;
+let cursorX, cursorY;
+let brushSpeed = 2.5;
+let avoidanceRadius = 100;
+let randomAngle;
+let centerPullStrength = 6;
+let edgeRepulsionStrength = 2;
 
-<script>
-    // Your p5.js code goes here
+let cursorGrab;
+let cursorIdle;
+let brushIcon;
+let menuImage;
 
-    let brushLayer;
-    let cursorLayer;
+let brushIconSize = 30;
+let showWarning = false;
+let warningTimer = 0;
+let warningDuration = 120;
 
-    let brushX, brushY;
-    let cursorX, cursorY;
-    let brushSpeed = 2.5;
-    let avoidanceRadius = 100;
-    let randomAngle;
-    let centerPullStrength = 6;
-    let edgeRepulsionStrength = 2;
+function preload() {
+  cursorGrab = loadImage("cursor-grab.png");
+  cursorIdle = loadImage("cursor.png");
+  brushIcon = loadImage("brush.png");
+  menuImage = loadImage("menu.png");
+}
 
-    let cursorGrab;
-    let cursorIdle;
-    let brushIcon;
-    let menuImage;
+function setup() {
+  createCanvas(900, 700, WEBGL);
+  noCursor();
 
-    let brushIconSize = 30;
-    let showWarning = false;
-    let warningTimer = 0;
-    let warningDuration = 120;
+  brushLayer = createGraphics(900, 700);
+  brushLayer.background(255);
 
-    function setup() {
-        createCanvas(900, 700);
-        noCursor();
+  cursorLayer = createGraphics(900, 700);
 
-        brushLayer = createGraphics(width, height);
-        brushLayer.background(255);
+  brushX = width / 2;
+  brushY = height / 2;
+  cursorX = width / 2;
+  cursorY = height / 2;
+  randomAngle = random(TWO_PI);
+}
 
-        cursorLayer = createGraphics(width, height);
+function draw() {
+  background(255);
 
-        cursorGrab = loadImage("cursor-grab.png");
-        cursorIdle = loadImage("cursor.png");
-        brushIcon = loadImage("brush.png");
-        menuImage = loadImage("menu.png");
+  let invertedX = width - mouseX;
+  let invertedY = height - mouseY;
+  cursorX = lerp(cursorX, invertedX, 0.005);
+  cursorY = lerp(cursorY, invertedY, 0.005);
 
-        brushX = width / 2;
-        brushY = height / 2;
-        cursorX = width / 2;
-        cursorY = height / 2;
-        randomAngle = random(TWO_PI);
-    }
+  let d = dist(brushX, brushY, cursorX, cursorY);
+  let moveX = 0;
+  let moveY = 0;
 
-    function draw() {
-        background(255);
+  if (d < avoidanceRadius) {
+    let angle = atan2(brushY - cursorY, brushX - cursorX);
+    let superSpeed = brushSpeed * 10;
+    moveX = cos(angle) * superSpeed;
+    moveY = sin(angle) * superSpeed;
+  } else {
+    randomAngle += random(-PI / 16, PI / 16);
+    moveX = cos(randomAngle) * brushSpeed;
+    moveY = sin(randomAngle) * brushSpeed;
+  }
 
-        // Update fake cursor (inverted and slowed)
-        let invertedX = width - mouseX;
-        let invertedY = height - mouseY;
-        cursorX = lerp(cursorX, invertedX, 0.005);
-        cursorY = lerp(cursorY, invertedY, 0.005);
+  let centerX = (100 + 875) / 2.0;
+  let centerY = (175 + 600) / 2.0;
+  let toCenterX = centerX - brushX;
+  let toCenterY = centerY - brushY;
+  moveX += toCenterX * centerPullStrength / width;
+  moveY += toCenterY * centerPullStrength / height;
 
-        let d = dist(brushX, brushY, cursorX, cursorY);
-        let moveX = 0;
-        let moveY = 0;
+  if (brushX < 100) moveX += edgeRepulsionStrength;
+  if (brushX > 875) moveX -= edgeRepulsionStrength;
+  if (brushY < 175) moveY += edgeRepulsionStrength;
+  if (brushY > 600) moveY -= edgeRepulsionStrength;
 
-        if (d < avoidanceRadius) {
-            let angle = atan2(brushY - cursorY, brushX - cursorX);
-            let superSpeed = brushSpeed * 10;
-            moveX = cos(angle) * superSpeed;
-            moveY = sin(angle) * superSpeed;
-        } else {
-            randomAngle += random(-PI / 16, PI / 16);
-            moveX = cos(randomAngle) * brushSpeed;
-            moveY = sin(randomAngle) * brushSpeed;
-        }
+  let prevBrushX = brushX;
+  let prevBrushY = brushY;
 
-        // Center pull to drawing area center
-        let centerX = (100 + 875) / 2.0;
-        let centerY = (175 + 600) / 2.0;
-        let toCenterX = centerX - brushX;
-        let toCenterY = centerY - brushY;
-        moveX += toCenterX * centerPullStrength / width;
-        moveY += toCenterY * centerPullStrength / height;
+  brushX += moveX;
+  brushY += moveY;
 
-        // Repulsion from edges of drawing area
-        if (brushX < 100) moveX += edgeRepulsionStrength;
-        if (brushX > 875) moveX -= edgeRepulsionStrength;
-        if (brushY < 175) moveY += edgeRepulsionStrength;
-        if (brushY > 600) moveY -= edgeRepulsionStrength;
+  brushX = constrain(brushX, 100, 875);
+  brushY = constrain(brushY, 175, 600);
 
-        let prevBrushX = brushX;
-        let prevBrushY = brushY;
+  brushLayer.stroke(0);
+  brushLayer.strokeWeight(4);
+  brushLayer.line(prevBrushX, prevBrushY, brushX, brushY);
+  image(brushLayer, -width/2, -height/2);
 
-        brushX += moveX;
-        brushY += moveY;
+  image(menuImage, -width/2, -height/2, 900, 700);
+  image(brushIcon, brushX - brushIconSize / 3 - width/2, brushY - brushIconSize - height/2, brushIconSize, brushIconSize);
 
-        brushX = constrain(brushX, 100, 875);
-        brushY = constrain(brushY, 175, 600);
+  let fakeInside = (cursorX >= 100 && cursorX <= 875 && cursorY >= 175 && cursorY <= 600);
+  let currentCursor = fakeInside ? cursorGrab : cursorIdle;
 
-        // Draw brush trail
-        brushLayer.beginDraw();
-        brushLayer.stroke(0);
-        brushLayer.strokeWeight(4);
-        brushLayer.line(prevBrushX, prevBrushY, brushX, brushY);
-        brushLayer.endDraw();
-        image(brushLayer, 0, 0);
+  cursorLayer.clear();
 
-        // UI image on top of drawing
-        image(menuImage, 0, 0, 900, 700);
+  if (fakeInside) {
+    cursorLayer.image(currentCursor, cursorX - currentCursor.width / 2, cursorY - currentCursor.height / 2);
+  } else {
+    let scale = 0.35;
+    let scaledW = currentCursor.width * scale;
+    let scaledH = currentCursor.height * scale;
+    cursorLayer.image(currentCursor, cursorX - scaledW / 2, cursorY - scaledH / 2, scaledW, scaledH);
+  }
 
-        // Brush icon
-        image(brushIcon, brushX - brushIconSize / 3, brushY - brushIconSize, brushIconSize, brushIconSize);
+  image(cursorLayer, -width/2, -height/2);
 
-        // Determine if fake cursor is inside drawing bounds
-        let fakeInside = (cursorX >= 100 && cursorX <= 875 && cursorY >= 175 && cursorY <= 600);
-        let currentCursor = fakeInside ? cursorGrab : cursorIdle;
+  if (showWarning) {
+    fill(255, 0, 0);
+    textAlign(CENTER, CENTER);
+    textSize(22);
+    text("Please first capture the brush before proceeding with further action", 0, 0);
+    warningTimer--;
+    if (warningTimer <= 0) showWarning = false;
+  }
+}
 
-        // Draw fake cursor
-        cursorLayer.beginDraw();
-        cursorLayer.clear();
-
-        if (fakeInside) {
-            cursorLayer.image(currentCursor, cursorX - currentCursor.width / 2, cursorY - currentCursor.height / 2);
-        } else {
-            let scale = 0.35;
-            let scaledW = currentCursor.width * scale;
-            let scaledH = currentCursor.height * scale;
-            cursorLayer.image(currentCursor, cursorX - scaledW / 2, cursorY - scaledH / 2, scaledW, scaledH);
-        }
-
-        cursorLayer.endDraw();
-        image(cursorLayer, 0, 0);
-
-        // Warning message
-        if (showWarning) {
-            fill(255, 0, 0);
-            textAlign(CENTER, CENTER);
-            textSize(22);
-            text("Please first capture the brush before proceeding with further action", width / 2, height / 2);
-            warningTimer--;
-            if (warningTimer <= 0) showWarning = false;
-        }
-    }
-
-    function mousePressed() {
-        // Check if fake cursor is inside the drawing area
-        let fakeInside = (cursorX >= 100 && cursorX <= 875 && cursorY >= 175 && cursorY <= 600);
-        if (!fakeInside) {
-            showWarning = true;
-            warningTimer = warningDuration;
-        }
-    }
-</script>
-
-</body>
-</html>
+function mousePressed() {
+  let fakeInside = (cursorX >= 100 && cursorX <= 875 && cursorY >= 175 && cursorY <= 600);
+  if (!fakeInside) {
+    showWarning = true;
+    warningTimer = warningDuration;
+  }
+}
